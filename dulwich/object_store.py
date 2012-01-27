@@ -226,6 +226,9 @@ class PackBasedObjectStore(BaseObjectStore):
     def __init__(self):
         self._pack_cache = None
 
+    def close(self):
+        self._clear_pack_cache()
+
     @property
     def alternates(self):
         return []
@@ -251,10 +254,17 @@ class PackBasedObjectStore(BaseObjectStore):
         if self._pack_cache is not None:
             self._pack_cache.append(pack)
 
+    def _clear_pack_cache(self):
+        for pack in self._pack_cache or []:
+            pack.close()
+        self._pack_cache = None
+
     @property
     def packs(self):
         """List with pack objects."""
-        if self._pack_cache is None or self._pack_cache_stale():
+        if self._pack_cache_stale():
+            self._clear_pack_cache()
+        if self._pack_cache is None:
             self._pack_cache = self._load_packs()
         return self._pack_cache
 
