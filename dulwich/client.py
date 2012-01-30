@@ -544,6 +544,33 @@ class TCPGitClient(TraditionalGitClient):
         return proto, lambda: _fileno_can_read(s)
 
 
+if subprocess.mswindows:
+    from msvcrt import get_osfhandle
+    try:
+        from win32pipe import PeekNamedPipe
+    except ImportError:
+        import ctypes
+        from ctypes.wintypes import HANDLE, LPVOID, DWORD, BOOL
+        LPDWORD = ctypes.POINTER(DWORD)
+
+        _PeekNamedPipe = ctypes.windll.kernel32.PeekNamedPipe
+        _PeekNamedPipe.argtypes = (
+            HANDLE, LPVOID, DWORD, LPDWORD, LPDWORD, LPDWORD
+        )
+        _PeekNamedPipe.restype = BOOL
+
+        def PeekNamedPipe(handle, size):
+            buf = ctypes.create_string_buffer(size)
+            bytes_read = DWORD()
+            bytes_avail = DWORD()
+            ret = _PeekNamedPipe(
+                handle, buf, size,
+                ctypes.byref(bytes_read), ctypes.byref(bytes_avail), None
+            )
+            if not ret:
+                return "", 0, 0
+            return buf.value, bytes_read.value, bytes_avail.value
+
 class SubprocessWrapper(object):
     """A socket-like object that talks to a subprocess via pipes."""
 
@@ -552,13 +579,12 @@ class SubprocessWrapper(object):
         self.read = proc.stdout.read
         self.write = proc.stdin.write
 
-    def can_read(self):
-        if subprocess.mswindows:
-            from msvcrt import get_osfhandle
-            from win32pipe import PeekNamedPipe
+    if subprocess.mswindows:
+        def can_read(self):
             handle = get_osfhandle(self.proc.stdout.fileno())
             return PeekNamedPipe(handle, 0)[2] != 0
-        else:
+    else:
+        def can_read(self):
             return _fileno_can_read(self.proc.stdout.fileno())
 
     def close(self):
