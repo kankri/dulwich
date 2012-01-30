@@ -75,6 +75,8 @@ class DulwichClientTestBase(object):
         src = repo.Repo(os.path.join(self.gitroot, 'server_new.export'))
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
         self.assertReposEqual(src, dest)
+        src.close()
+        dest.close()
 
     def _client(self):
         raise NotImplementedError()
@@ -90,6 +92,7 @@ class DulwichClientTestBase(object):
         del sendrefs['HEAD']
         c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
                     src.object_store.generate_pack_contents)
+        src.close()
 
     def test_send_pack(self):
         self._do_send_pack()
@@ -111,6 +114,7 @@ class DulwichClientTestBase(object):
         c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
                     src.object_store.generate_pack_contents)
         self.assertDestEqualsSrc()
+        src.close()
 
     def make_dummy_commit(self, dest):
         b = objects.Blob.from_string('hi')
@@ -138,12 +142,13 @@ class DulwichClientTestBase(object):
         src = repo.Repo(srcpath)
         sendrefs = dict(src.get_refs())
         del sendrefs['HEAD']
-        return sendrefs, src.object_store.generate_pack_contents
+        return sendrefs, src
 
     def test_send_pack_one_error(self):
         dest, dummy_commit = self.disable_ff_and_make_dummy_commit()
         dest.refs['refs/heads/master'] = dummy_commit
-        sendrefs, gen_pack = self.compute_send()
+        sendrefs, sendrepo = self.compute_send()
+        gen_pack = sendrepo.object_store.generate_pack_contents
         c = self._client()
         try:
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
@@ -152,12 +157,15 @@ class DulwichClientTestBase(object):
             self.assertEqual({'refs/heads/branch': 'ok',
                               'refs/heads/master': 'non-fast-forward'},
                              e.ref_status)
+        dest.close()
+        sendrepo.close()
 
     def test_send_pack_multiple_errors(self):
         dest, dummy = self.disable_ff_and_make_dummy_commit()
         # set up for two non-ff errors
         dest.refs['refs/heads/branch'] = dest.refs['refs/heads/master'] = dummy
-        sendrefs, gen_pack = self.compute_send()
+        sendrefs, sendrepo = self.compute_send()
+        gen_pack = sendrepo.object_store.generate_pack_contents
         c = self._client()
         try:
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
@@ -167,6 +175,8 @@ class DulwichClientTestBase(object):
             self.assertEqual({'refs/heads/branch': 'non-fast-forward',
                               'refs/heads/master': 'non-fast-forward'},
                              e.ref_status)
+        dest.close()
+        sendrepo.close()
 
     def test_archive(self):
         c = self._client()
@@ -182,16 +192,23 @@ class DulwichClientTestBase(object):
         refs = c.fetch(self._build_path('/server_new.export'), dest)
         map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
         self.assertDestEqualsSrc()
+        dest.close()
 
     def test_incremental_fetch_pack(self):
         self.test_fetch_pack()
-        dest, dummy = self.disable_ff_and_make_dummy_commit()
-        dest.refs['refs/heads/master'] = dummy
+        dest0, dummy = self.disable_ff_and_make_dummy_commit()
+        try:
+            dest0.refs['refs/heads/master'] = dummy
+        finally:
+            dest0.close()
         c = self._client()
         dest = repo.Repo(os.path.join(self.gitroot, 'server_new.export'))
-        refs = c.fetch(self._build_path('/dest'), dest)
-        map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
-        self.assertDestEqualsSrc()
+        try:
+            refs = c.fetch(self._build_path('/dest'), dest)
+            map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+            self.assertDestEqualsSrc()
+        finally:
+            dest.close()
 
     def test_fetch_pack_zero_sha(self):
         # zero sha1s are already present on the client, and should
@@ -201,6 +218,7 @@ class DulwichClientTestBase(object):
         refs = c.fetch(self._build_path('/server_new.export'), dest,
             lambda refs: [protocol.ZERO_SHA])
         map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+        dest.close()
 
     def test_send_remove_branch(self):
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
@@ -215,6 +233,7 @@ class DulwichClientTestBase(object):
         self.assertEquals(dest.refs["refs/heads/abranch"], dummy_commit)
         c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
         self.assertFalse("refs/heads/abranch" in dest.refs)
+        dest.close()
 
 
 class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):

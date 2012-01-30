@@ -813,6 +813,9 @@ class BaseRepo(object):
         self.object_store = object_store
         self.refs = refs
 
+    def close(self):
+        self.object_store.close()
+
     def _init_files(self, bare):
         """Initialize a default set of named files."""
         from dulwich.config import ConfigFile
