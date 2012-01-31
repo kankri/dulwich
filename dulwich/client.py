@@ -600,6 +600,7 @@ class SubprocessGitClient(TraditionalGitClient):
     """Git client that talks to a server using a subprocess."""
 
     def __init__(self, *args, **kwargs):
+        self.subprocess = None
         self._connection = None
         self._stderr = None
         self._stderr = kwargs.get('stderr')
@@ -607,12 +608,19 @@ class SubprocessGitClient(TraditionalGitClient):
             del kwargs['stderr']
         TraditionalGitClient.__init__(self, *args, **kwargs)
 
+    def close(self):
+        if self.subprocess:
+            self.subprocess.close()
+            self.subprocess = None
+        TraditionalGitClient.close(self)
+
     def _connect(self, service, path):
         argv = ['git', service, path]
         p = SubprocessWrapper(
             subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,
                              stderr=self._stderr))
+        self.subprocess = p
         return Protocol(p.read, p.write,
                         report_activity=self._report_activity), p.can_read
 
