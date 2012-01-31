@@ -93,6 +93,7 @@ class DulwichClientTestBase(object):
         c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
                     src.object_store.generate_pack_contents)
         src.close()
+        c.close()
 
     def test_send_pack(self):
         self._do_send_pack()
@@ -115,6 +116,7 @@ class DulwichClientTestBase(object):
                     src.object_store.generate_pack_contents)
         self.assertDestEqualsSrc()
         src.close()
+        c.close()
 
     def make_dummy_commit(self, dest):
         b = objects.Blob.from_string('hi')
@@ -159,6 +161,7 @@ class DulwichClientTestBase(object):
                              e.ref_status)
         dest.close()
         sendrepo.close()
+        c.close()
 
     def test_send_pack_multiple_errors(self):
         dest, dummy = self.disable_ff_and_make_dummy_commit()
@@ -177,6 +180,7 @@ class DulwichClientTestBase(object):
                              e.ref_status)
         dest.close()
         sendrepo.close()
+        c.close()
 
     def test_archive(self):
         c = self._client()
@@ -185,6 +189,7 @@ class DulwichClientTestBase(object):
         f.seek(0)
         tf = tarfile.open(fileobj=f)
         self.assertEquals(['baz', 'foo'], tf.getnames())
+        c.close()
 
     def test_fetch_pack(self):
         c = self._client()
@@ -193,6 +198,7 @@ class DulwichClientTestBase(object):
         map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
         self.assertDestEqualsSrc()
         dest.close()
+        c.close()
 
     def test_incremental_fetch_pack(self):
         self.test_fetch_pack()
@@ -222,6 +228,7 @@ class DulwichClientTestBase(object):
             lambda refs: [protocol.ZERO_SHA])
         map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
         dest.close()
+        c.close()
 
     def test_send_remove_branch(self):
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
@@ -237,6 +244,7 @@ class DulwichClientTestBase(object):
         c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
         self.assertFalse("refs/heads/abranch" in dest.refs)
         dest.close()
+        c.close()
 
 
 class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
