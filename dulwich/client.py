@@ -639,11 +639,18 @@ get_ssh_vendor = SSHVendor
 class SSHGitClient(TraditionalGitClient):
 
     def __init__(self, host, port=None, username=None, *args, **kwargs):
+        self.con = None
         self.host = host
         self.port = port
         self.username = username
         TraditionalGitClient.__init__(self, *args, **kwargs)
         self.alternative_paths = {}
+
+    def close(self):
+        if self.con:
+            self.con.close()
+            self.con = None
+        TraditionalGitClient.close(self)
 
     def _get_cmd_path(self, cmd):
         return self.alternative_paths.get(cmd, 'git-%s' % cmd)
@@ -652,6 +659,7 @@ class SSHGitClient(TraditionalGitClient):
         con = get_ssh_vendor().connect_ssh(
             self.host, ["%s '%s'" % (self._get_cmd_path(cmd), path)],
             port=self.port, username=self.username)
+        self.con = con
         return (Protocol(con.read, con.write, report_activity=self._report_activity),
                 con.can_read)
 
