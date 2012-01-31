@@ -158,6 +158,9 @@ class GitClient(object):
         if thin_packs:
             self._fetch_capabilities.add('thin-pack')
 
+    def close(self):
+        pass
+
     def _read_refs(self, proto):
         server_capabilities = None
         refs = {}
