@@ -152,6 +152,25 @@ def run_git_or_fail(args, git_path=_DEFAULT_GIT, input=None, **popen_kwargs):
     return stdout
 
 
+def run_git_in_bg_or_fail(args, git_path=_DEFAULT_GIT, **popen_kwargs):
+    dev_null = os.name == 'nt' and 'nul:' or '/dev/null'
+
+    popen_kwargs['stdin'] = open(dev_null, 'rb')
+    popen_kwargs['stdout'] = open(dev_null, 'wb')
+    popen_kwargs['stderr'] = open(dev_null, 'wb')
+
+    p = subprocess.Popen([git_path] + args, **popen_kwargs)
+    if p.returncode is not None and p.returncode !=0 :
+        raise AssertionError("git with args %r failed with %s" % (
+            args, p.returncode))
+
+    popen_kwargs['stdin'].close()
+    popen_kwargs['stdout'].close()
+    popen_kwargs['stderr'].close()
+
+    return p
+
+
 def import_repo_to_dir(name):
     """Import a repo from a fast-export file in a temporary directory.
 

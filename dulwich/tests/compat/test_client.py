@@ -50,7 +50,8 @@ from dulwich.tests.compat.utils import (
     check_for_daemon,
     import_repo_to_dir,
     kill_process,
-    run_git_or_fail,
+    run_git_in_bg_or_fail,
+    run_git_or_fail
     )
 from dulwich.tests.compat.server_utils import (
     ShutdownServerMixIn,
@@ -259,10 +260,11 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         fd, self.pidfile = tempfile.mkstemp(prefix='dulwich-test-git-client',
                                             suffix=".pid")
         os.fdopen(fd).close()
-        run_git_or_fail(
+
+        self.git_daemon = run_git_in_bg_or_fail(
             ['daemon', '--verbose', '--export-all',
              '--pid-file=%s' % self.pidfile, '--base-path=%s' % self.gitroot,
-             '--detach', '--reuseaddr', '--enable=receive-pack',
+             '--reuseaddr', '--enable=receive-pack',
              '--enable=upload-archive', '--listen=localhost', self.gitroot], cwd=self.gitroot)
         if not check_for_daemon():
             raise SkipTest('git-daemon failed to start')
@@ -274,6 +276,11 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
             os.unlink(self.pidfile)
         except (OSError, IOError):
             pass
+
+        # Need to wait until the Git daemon has died, otherwise the directory
+        # it was serving cannot be deleted in Windows
+        self.git_daemon.wait()
+
         DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
 
