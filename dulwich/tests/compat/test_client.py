@@ -48,6 +48,7 @@ from dulwich.tests import (
 from dulwich.tests.compat.utils import (
     CompatTestCase,
     check_for_daemon,
+    git_version,
     import_repo_to_dir,
     kill_process,
     run_git_in_bg_or_fail,
@@ -289,6 +290,13 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 
     def _build_path(self, path):
         return path
+
+    if os.name == 'nt' and git_version() <= (1, 7, 8, 0):
+        def test_archive(self):
+            raise SkipTest(
+                'upload-archive: Function not implemented: see '
+                'http://permalink.gmane.org/gmane.comp.version-control.msysgit/13035'
+            )
 
 
 class TestSSHVendor(object):
