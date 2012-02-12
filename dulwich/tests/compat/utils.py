@@ -21,6 +21,7 @@
 
 import errno
 import os
+import signal
 import socket
 import tempfile
 import time
@@ -39,6 +40,18 @@ _VERSION_LEN = 4
 _REPOS_DATA_DIR = os.path.abspath(os.path.join(
     os.path.dirname(__file__), os.pardir, 'data', 'repos'))
 
+if os.name != 'nt':
+    def kill_process(pid):
+        os.kill(pid, signal.SIGKILL)
+else:
+    import ctypes
+    def kill_process(pid):
+        import ctypes
+        PROCESS_TERMINATE = 1
+        handle = ctypes.windll.kernel32.OpenProcess(
+            PROCESS_TERMINATE, False, pid)
+        ctypes.windll.kernel32.TerminateProcess(handle, -1)
+        ctypes.windll.kernel32.CloseHandle(handle)
 
 def git_version(git_path=_DEFAULT_GIT):
     """Attempt to determine the version of git currently installed.

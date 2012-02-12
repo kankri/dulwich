@@ -49,6 +49,7 @@ from dulwich.tests.compat.utils import (
     CompatTestCase,
     check_for_daemon,
     import_repo_to_dir,
+    kill_process,
     run_git_or_fail,
     )
 from dulwich.tests.compat.server_utils import (
@@ -268,7 +269,8 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 
     def tearDown(self):
         try:
-            os.kill(int(open(self.pidfile).read().strip()), signal.SIGKILL)
+            pid = int(open(self.pidfile).read().strip())
+            kill_process(pid)
             os.unlink(self.pidfile)
         except (OSError, IOError):
             pass
