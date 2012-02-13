@@ -268,9 +268,18 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
              '--reuseaddr', '--enable=receive-pack',
              '--enable=upload-archive', '--listen=localhost', self.gitroot], cwd=self.gitroot)
         if not check_for_daemon():
+            # It's possible the daemon process started but is just not
+            # responding. If we raise SkipTest(), tearDown() is not
+            # called. Let's get rid of the process now.
+            # 
+            # Using addCleanup() wouldn't help because it would call the method
+            # only after tearDown() in the normal case which is too late:
+            # tearDown() fails if there are processes holding files open in
+            # the test directory.
+            self._kill_daemon()
             raise SkipTest('git-daemon failed to start')
 
-    def tearDown(self):
+    def _kill_daemon(self):
         try:
             pid = int(open(self.pidfile).read().strip())
             kill_process(pid)
@@ -282,6 +291,8 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         # it was serving cannot be deleted in Windows
         self.git_daemon.wait()
 
+    def tearDown(self):
+        self._kill_daemon()
         DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
 
