@@ -282,6 +282,13 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
     def _kill_daemon(self):
         try:
             pid = int(open(self.pidfile).read().strip())
+            # Without this ugly sleep a child git-daemon process doesn't
+            # have enough time to exit before its parent is killed and it
+            # goes into a suspended state keeping resources locked and
+            # preventing other test cases properly starting new git-daemons
+            # on Windows!
+            import time
+            time.sleep(0.5)
             kill_process(pid)
             os.unlink(self.pidfile)
         except (OSError, IOError):
