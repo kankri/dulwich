@@ -91,12 +91,14 @@ class DulwichClientTestBase(object):
         c = self._client()
         srcpath = os.path.join(self.gitroot, 'server_new.export')
         src = repo.Repo(srcpath)
-        sendrefs = dict(src.get_refs())
-        del sendrefs['HEAD']
-        c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
-                    src.object_store.generate_pack_contents)
-        src.close()
-        c.close()
+        try:
+            sendrefs = dict(src.get_refs())
+            del sendrefs['HEAD']
+            c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
+                        src.object_store.generate_pack_contents)
+        finally:
+            src.close()
+            c.close()
 
     def test_send_pack(self):
         self._do_send_pack()
@@ -113,13 +115,15 @@ class DulwichClientTestBase(object):
         c._send_capabilities.remove('report-status')
         srcpath = os.path.join(self.gitroot, 'server_new.export')
         src = repo.Repo(srcpath)
-        sendrefs = dict(src.get_refs())
-        del sendrefs['HEAD']
-        c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
-                    src.object_store.generate_pack_contents)
-        self.assertDestEqualsSrc()
-        src.close()
-        c.close()
+        try:
+            sendrefs = dict(src.get_refs())
+            del sendrefs['HEAD']
+            c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
+                        src.object_store.generate_pack_contents)
+            self.assertDestEqualsSrc()
+        finally:
+            src.close()
+            c.close()
 
     def make_dummy_commit(self, dest):
         b = objects.Blob.from_string('hi')
