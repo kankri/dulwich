@@ -39,6 +39,7 @@ Known capabilities that are not supported:
 __docformat__ = 'restructuredText'
 
 from cStringIO import StringIO
+import os
 import select
 import socket
 import urllib2
@@ -537,6 +538,22 @@ class TCPGitClient(TraditionalGitClient):
             raise err
         # -1 means system default buffering
         rfile = s.makefile('rb', -1)
+        if os.name == 'nt':
+            class _safe_rfile:
+                def __init__(self, rfile):
+                    self.rfile = rfile
+                def read(self, size=None):
+                    try:
+                        return self.rfile.read(size)
+                    except socket.error, e:
+                        if e.errno == 10054:
+                            # On Windows you can receive:
+                            #   [Errno 10054] An existing connection was
+                            #   forcibly closed by the remote host
+                            # Let's pretend it means end-of-file
+                            return ""
+                        raise
+            rfile = _safe_rfile(rfile)
         # 0 means unbuffered
         wfile = s.makefile('wb', 0)
         proto = Protocol(rfile.read, wfile.write,
