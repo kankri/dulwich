@@ -21,6 +21,7 @@
 from cStringIO import StringIO
 import os
 import re
+import socket
 import sys
 import time
 
@@ -357,12 +358,45 @@ class HTTPGitApplication(object):
 # to use the HTTP server without a little extra work.
 try:
     from wsgiref.simple_server import (
+        ServerHandler,
         WSGIRequestHandler,
         make_server,
         )
 
+    class myServerHandler(ServerHandler):
+        def handle_error(self):
+            try:
+                raise
+            except socket.error, e:
+                if e.errno == 10053:
+                    # On Windows you get:
+                    #   [Errno 10053] An established connection was aborted
+                    #   by the software in your host machine
+                    # when the Git client drops the connection after it sees
+                    # 404 response without waiting for all the headers.
+                    # This is harmless.
+                    logger.debug("Ignoring harmless exception %s" % e)
+                else:
+                    raise
+
+
     class HTTPGitRequestHandler(WSGIRequestHandler):
         """Handler that uses dulwich's logger for logging exceptions."""
+
+        def __init__(self, *args, **kwargs):
+            try:
+                WSGIRequestHandler.__init__(self, *args, **kwargs)
+            except socket.error, e:
+                if e.errno == 10053:
+                    # On Windows you get:
+                    #   [Errno 10053] An established connection was aborted
+                    #   by the software in your host machine
+                    # when the Git client drops the connection after it sees
+                    # 404 response without waiting for all the headers.
+                    # This is harmless.
+                    logger.debug("Ignoring harmless exception %s" % e)
+                else:
+                    raise
 
         def log_exception(self, exc_info):
             logger.exception('Exception happened during processing of request',
@@ -373,6 +407,20 @@ try:
 
         def log_error(self, *args):
             logger.error(*args)
+
+        def handle(self):
+            """Handle a single HTTP request.
+            Copied from wsgiref.simple_server.WSGIRequestHandler.handle()"""
+
+            self.raw_requestline = self.rfile.readline()
+            if not self.parse_request(): # An error code has been sent, just exit
+                return
+
+            handler = myServerHandler(
+                self.rfile, self.wfile, self.get_stderr(), self.get_environ()
+            )
+            handler.request_handler = self      # backpointer for logging
+            handler.run(self.server.get_app())
 
 
     def main(argv=sys.argv):
